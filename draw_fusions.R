@@ -122,6 +122,9 @@ DEFAULT_CONFIG <- list(
   )
 )
 
+# 使用默认配置
+config <- DEFAULT_CONFIG
+
 
 # =============================================================================
 # 第二部分：工具函数 - 颜色处理
@@ -734,40 +737,45 @@ removeIntronsFromProteinDomains <- function(codingExons, retainedDomains) {
 # =============================================================================
 
 parameters <- list(
+  # 文件输入模式 (二选一)
   fusions = list("fusionsFile", "file", ""),
+
+  # 必需参数
   annotation = list("exonsFile", "file", "annotation.gtf", TRUE),
   output = list("outputFile", "string", "output.pdf", TRUE),
+
+  # 可选参数
   alignments = list("alignmentsFile", "file", "Aligned.sortedByCoord.out.bam"),
   cytobands = list("cytobandsFile", "file", "cytobands.tsv"),
-  minConfidenceForCircosPlot = list("minConfidenceForCircosPlot", "string", "medium"),
   proteinDomains = list("proteinDomainsFile", "file", "protein_domains.gff3"),
   sampleName = list("sampleName", "string", ""),
-  squishIntrons = list("squishIntrons", "bool", TRUE),
-  printExonLabels = list("printExonLabels", "bool", TRUE),
-  render3dEffect = list("render3dEffect", "bool", TRUE),
+  minConfidenceForCircosPlot = list("minConfidenceForCircosPlot", "string", "medium"),
   plotPanels = list("plotPanels", "string", "fusion,circos,domains,readcounts"),
   pdfWidth = list("pdfWidth", "numeric", 11.692),
   pdfHeight = list("pdfHeight", "numeric", 8.267),
   color1 = list("color1", "string", "#e5a5a5"),
   color2 = list("color2", "string", "#a7c4e5"),
-  mergeDomainsOverlappingBy = list("mergeDomainsOverlappingBy", "numeric", 0.9),
-  optimizeDomainColors = list("optimizeDomainColors", "bool", FALSE),
   fontSize = list("fontSize", "numeric", 1),
   fontFamily = list("fontFamily", "string", "Helvetica"),
+  squishIntrons = list("squishIntrons", "bool", TRUE),
+  printExonLabels = list("printExonLabels", "bool", TRUE),
+  render3dEffect = list("render3dEffect", "bool", TRUE),
   showIntergenicVicinity = list("showIntergenicVicinity", "string", "0"),
   transcriptSelection = list("transcriptSelection", "string", "provided"),
   fixedScale = list("fixedScale", "numeric", 0),
   coverageRange = list("coverageRange", "string", "0"),
-  # Single fusion mode parameters
-  gene1 = list("gene1", "string", ""),
-  gene2 = list("gene2", "string", ""),
-  contig1 = list("contig1", "string", ""),
-  contig2 = list("contig2", "string", ""),
-  breakpoint1 = list("breakpoint1", "numeric", 0),
-  breakpoint2 = list("breakpoint2", "numeric", 0),
-  direction1 = list("direction1", "string", "downstream"),
-  direction2 = list("direction2", "string", "downstream"),
-  fusion_type = list("fusion_type", "string", "translocation"),
+  mergeDomainsOverlappingBy = list("mergeDomainsOverlappingBy", "numeric", 0.9),
+  optimizeDomainColors = list("optimizeDomainColors", "bool", FALSE),
+
+  # 单融合模式参数
+  gene1 = list("gene1", "string", "", TRUE),
+  gene2 = list("gene2", "string", "", TRUE),
+  contig1 = list("contig1", "string", "", TRUE),
+  contig2 = list("contig2", "string", "", TRUE),
+  breakpoint1 = list("breakpoint1", "numeric", 0, TRUE),
+  breakpoint2 = list("breakpoint2", "numeric", 0, TRUE),
+  direction1 = list("direction1", "string", "downstream", TRUE),
+  direction2 = list("direction2", "string", "downstream", TRUE),
   strand1 = list("strand1", "string", "."),
   strand2 = list("strand2", "string", "."),
   site1 = list("site1", "string", "exon"),
@@ -833,6 +841,35 @@ for (arg in args) {
     if (file.access(argValue) == -1)
       stop(paste("Cannot read file:", argValue))
     assign(parameters[[argName]][[1]], argValue)
+  }
+}
+
+# 验证输入模式 (文件模式 vs 单融合模式)
+is_file_mode <- fusionsFile != ""
+is_single_fusion_mode <- gene1 != "" && gene2 != ""
+
+if (!is_file_mode && !is_single_fusion_mode) {
+  stop("Missing input: Either --fusions file or single fusion parameters (--gene1, --gene2, etc.) must be provided")
+}
+
+if (is_file_mode && is_single_fusion_mode) {
+  stop("Conflicting input: Cannot use both --fusions file and single fusion parameters at the same time")
+}
+
+# 自动推断单融合模式的 fusion_type
+if (is_single_fusion_mode) {
+  if (contig1 != contig2) {
+    fusion_type <- "translocation"
+  } else {
+    # 同一条染色体上
+    if (direction1 == direction2) {
+      fusion_type <- "inversion"
+    } else if ((direction1 == "downstream" && breakpoint1 < breakpoint2) ||
+               (direction1 == "upstream" && breakpoint1 > breakpoint2)) {
+      fusion_type <- "deletion"
+    } else {
+      fusion_type <- "duplication"
+    }
   }
 }
 
@@ -1584,9 +1621,9 @@ for (fusion in seq_len(nrow(fusions))) {
                   y_fusion, color1, exons1[exon, "exonNumber"],
                   exons1[exon, "type"], fontSize)
       lines(c(0, 0, fusion_offset_gene1), c(y_trajectory_exon_top, y_trajectory_exon_bottom,
-                                       yTrajectory_fusion), col = "red", lty = 2)
+                                       y_trajectory_fusion), col = "red", lty = 2)
       lines(c(breakpoint1, breakpoint1, fusion_offset_gene1 + breakpoint1),
-            c(yTrajectory_breakpoint_labels, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_breakpoint_labels, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
     } else if (fusions[fusion, "direction1"] == "upstream") {
       lines(c(fusion_offset_gene1, fusion_offset_gene2), c(y_fusion, y_fusion), col = dark_color_gene1)
@@ -1606,11 +1643,11 @@ for (fusion in seq_len(nrow(fusions))) {
                   y_fusion, color1, exons1[exon, "exonNumber"],
                   exons1[exon, "type"], fontSize)
       lines(c(max(exons1$right), max(exons1$right), fusion_offset_gene1),
-            c(y_trajectory_exon_top, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_exon_top, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
       lines(c(breakpoint1, breakpoint1,
               fusion_offset_gene1 + max(exons1$right) - breakpoint1),
-            c(yTrajectory_breakpoint_labels, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_breakpoint_labels, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
     }
 
@@ -1634,11 +1671,11 @@ for (fusion in seq_len(nrow(fusions))) {
                   y_fusion, color2, exons2[exon, "exonNumber"],
                   exons2[exon, "type"], fontSize)
       lines(c(second_gene_horizontal_offset, second_gene_horizontal_offset, fusion_offset_gene2 + breakpoint2),
-            c(y_trajectory_exon_top, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_exon_top, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
       lines(c(second_gene_horizontal_offset + breakpoint2, second_gene_horizontal_offset + breakpoint2,
               fusion_offset_gene2),
-            c(yTrajectory_breakpoint_labels, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_breakpoint_labels, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
     } else if (fusions[fusion, "direction2"] == "upstream") {
       lines(c(fusion_offset_gene2, fusion_offset_gene2 + max(exons2$right) - breakpoint2),
@@ -1661,11 +1698,11 @@ for (fusion in seq_len(nrow(fusions))) {
       lines(c(second_gene_horizontal_offset + max(exons2$right),
               second_gene_horizontal_offset + max(exons2$right),
               fusion_offset_gene2 + max(exons2$right) - breakpoint2),
-            c(y_trajectory_exon_top, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_exon_top, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
       lines(c(second_gene_horizontal_offset + breakpoint2, second_gene_horizontal_offset + breakpoint2,
               fusion_offset_gene2),
-            c(yTrajectory_breakpoint_labels, y_trajectory_exon_bottom, yTrajectory_fusion),
+            c(y_trajectory_breakpoint_labels, y_trajectory_exon_bottom, y_trajectory_fusion),
             col = "red", lty = 2)
     }
 

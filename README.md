@@ -79,66 +79,81 @@ Rscript -e "install.packages(c('GenomicRanges', 'circlize', 'GenomicAlignments')
 
 ## 使用方法
 
-### 模式1：文件输入
+**注意**：两种输入模式 **互斥**，二选一
+
+### 模式1：文件输入（批量融合）
 
 ```bash
 Rscript draw_fusions.R \
-  --fusions=fusions.tsv \
-  --annotation=annotation.gtf \
-  --output=output.pdf \
-  --alignments=Aligned.sortedByCoord.out.bam \
-  --cytobands=cytobands.tsv
+  --fusions=fusions.tsv \          # 必填：融合基因文件
+  --annotation=annotation.gtf \    # 必填：GTF注释文件
+  --output=output.pdf             # 必填：输出PDF
 ```
 
-### 模式2：单融合参数
+### 模式2：单融合参数（单个融合）
 
 ```bash
 Rscript draw_fusions.R \
-  --gene1=TMPRSS2 \
-  --gene2=ERG \
-  --contig1=21 \
-  --contig2=21 \
-  --breakpoint1=42882904 \
-  --breakpoint2=39919955 \
-  --annotation=annotation.gtf \
-  --output=fusion_visualization.pdf
+  --annotation=annotation.gtf \    # 必填：GTF注释文件
+  --output=fusion.pdf \           # 必填：输出PDF
+  # 单融合模式必填参数：
+  --gene1=TMPRSS2 \               # 基因1名称
+  --gene2=ERG \                   # 基因2名称
+  --contig1=chr2 \                # 染色体1 (chr2 或 2)
+  --contig2=chr2 \                # 染色体2
+  --breakpoint1=42526250 \        # 断点1位置
+  --breakpoint2=29447242          # 断点2位置
+
+# 可选参数（不提供则自动推断）：
+#   --transcript_id1=ENST00000439425   # 基因1的转录本ID
+#   --transcript_id2=ENST00000355722   # 基因2的转录本ID
+#   # direction 参数已废弃，会从 GTF 的 strand 自动推断
+
+# fusion_type 和 direction 会根据参数自动推断：
+#   - fusion_type: 根据 contig1/contig2 自动判断
+#   - direction: 根据 GTF 中基因的 strand 自动推断 (+→downstream, -→upstream)
 ```
 
 ### 完整参数列表
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `--fusions` | 文件 | 必填 | 融合基因文件（Arriba/STAR-Fusion格式） |
-| `--gene1` | 字符串 | "" | 融合基因1名称（单融合模式） |
-| `--gene2` | 字符串 | "" | 融合基因2名称（单融合模式） |
-| `--contig1` | 字符串 | "" | 染色体1编号（单融合模式） |
-| `--contig2` | 字符串 | "" | 染色体2编号（单融合模式） |
-| `--breakpoint1` | 数值 | 0 | 断点1位置（单融合模式） |
-| `--breakpoint2` | 数值 | 0 | 断点2位置（单融合模式） |
-| `--direction1` | 字符串 | downstream | 方向1（单融合模式） |
-| `--direction2` | 字符串 | downstream | 方向2（单融合模式） |
-| `--fusion_type` | 字符串 | translocation | 融合类型（单融合模式） |
-| `--strand1` | 字符串 | "." | 链信息1 |
-| `--strand2` | 字符串 | "." | 链信息2 |
-| `--site1` | 字符串 | exon | 断点位置类型1 |
-| `--site2` | 字符串 | exon | 断点位置类型2 |
-| `--reading_frame` | 字符串 | "." | 读码框信息 |
-| `--split_reads` | 数值 | 0 | split reads数量 |
-| `--discordant_mates` | 数值 | 0 | discordant mates数量 |
-| `--confidence` | 字符串 | high | 可信度 |
-| `--annotation` | 文件 | annotation.gtf | GTF注释文件 |
-| `--output` | 字符串 | output.pdf | 输出PDF文件名 |
-| `--alignments` | 文件 | Aligned.sortedByCoord.out.bam | BAM比对文件 |
-| `--cytobands` | 文件 | cytobands.tsv | 细胞带文件 |
-| `--proteinDomains` | 文件 | protein_domains.gff3 | 蛋白质结构域文件 |
-| `--sampleName` | 字符串 | "" | 样本名称 |
-| `--plotPanels` | 字符串 | fusion,circos,domains,readcounts | 绘制的面板 |
-| `--color1` | 字符串 | #e5a5a5 | 颜色1 |
-| `--color2` | 字符串 | #a7c4e5 | 颜色2 |
-| `--fontSize` | 数值 | 1 | 字体大小 |
-| `--fontFamily` | 字符串 | Helvetica | 字体家族 |
-| `--squishIntrons` | 布尔 | TRUE | 压缩内含子 |
-| `--render3dEffect` | 布尔 | TRUE | 3D渲染效果 |
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| **输入模式（二选一）** |
+| `--fusions` | 文件 | 否* | - | 融合基因文件（Arriba/STAR-Fusion格式） |
+| `--gene1` | 字符串 | ✅ | "" | 基因1名称 |
+| `--gene2` | 字符串 | ✅ | "" | 基因2名称 |
+| `--contig1` | 字符串 | ✅ | "" | 染色体1编号 |
+| `--contig2` | 字符串 | ✅ | "" | 染色体2编号 |
+| `--breakpoint1` | 数值 | ✅ | 0 | 断点1位置 |
+| `--breakpoint2` | 数值 | ✅ | 0 | 断点2位置 |
+| **必需参数** |
+| `--annotation` | 文件 | ✅ | annotation.gtf | GTF注释文件 |
+| `--output` | 字符串 | ✅ | output.pdf | 输出PDF文件名 |
+| **可选参数** |
+| `--strand1` | 字符串 | 否 | "." | 链信息 |
+| `--strand2` | 字符串 | 否 | "." | 链信息 |
+| `--transcript_id1` | 字符串 | 否 | "." | 基因1的转录本ID |
+| `--transcript_id2` | 字符串 | 否 | "." | 基因2的转录本ID |
+| `--transcriptSelection` | 字符串 | 否 | provided | 转录本选择策略 |
+| `--site1` | 字符串 | 否 | exon | 断点位置类型 |
+| `--site2` | 字符串 | 否 | exon | 断点位置类型 |
+| `--reading_frame` | 字符串 | 否 | "." | 读码框 |
+| `--split_reads` | 数值 | 否 | 0 | split reads数 |
+| `--discordant_mates` | 数值 | 否 | 0 | discordant mates数 |
+| `--confidence` | 字符串 | 否 | high | 可信度 |
+| `--alignments` | 文件 | 否 | - | BAM比对文件 |
+| `--cytobands` | 文件 | 否 | cytobands.tsv | 细胞带文件 |
+| `--proteinDomains` | 文件 | 否 | protein_domains.gff3 | 蛋白质结构域 |
+| `--sampleName` | 字符串 | 否 | "" | 样本名称 |
+| `--plotPanels` | 字符串 | 否 | fusion,circos,domains,readcounts | 面板组合 |
+| `--color1` | 字符串 | 否 | #e5a5a5 | 基因1颜色 |
+| `--color2` | 字符串 | 否 | #a7c4e5 | 基因2颜色 |
+| `--fontSize` | 数值 | 否 | 1 | 字体大小 |
+| `--fontFamily` | 字符串 | 否 | Helvetica | 字体家族 |
+| `--squishIntrons` | 布尔 | 否 | TRUE | 压缩内含子 |
+| `--render3dEffect` | 布尔 | 否 | TRUE | 3D效果 |
+
+> * 单融合模式需要 `--gene1`, `--gene2`, `--contig1`, `--contig2`, `--breakpoint1`, `--breakpoint2` 同时提供
 
 ## 配置系统
 

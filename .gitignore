@@ -205,3 +205,65 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# =============================================================================
+# R Language
+# =============================================================================
+# Compiled R objects
+*.Rapp.history
+*.RData
+*.Rds
+
+# R user library directory
+.Rlib/
+*.rds
+
+# R session images
+.Rhistory
+
+# R cache
+.Rcache/
+
+# RStudio project settings
+.Rproj.user/
+
+# Roxygen documentation
+man/
+NAMESPACE
+
+# Latex/Sweave cache
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+
+# =============================================================================
+# Claude Code
+# =============================================================================
+# Claude Code session data and logs
+.claude/
+.claude_session/
+*.claude
+.clauderunning
+
+# Claude Code configuration (if contains sensitive data)
+# .clauderc
+
+# MCP (Model Context Protocol) cache
+.mcp_cache/
+
+# =============================================================================
+# R specific data files (optional)
+# =============================================================================
+*.bam
+*.bai
+*.gtf
+*.gff3
+*.tsv
+*.vcf
+
+# Large test data
+test_data/
+*.RData

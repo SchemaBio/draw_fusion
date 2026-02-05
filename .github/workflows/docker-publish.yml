@@ -9,7 +9,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Docker 仓库名必须小写
+  IMAGE_NAME: schemabio/draw_fusion
 
 jobs:
   build-and-push:
@@ -38,7 +39,6 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$REGISTRY/$IMAGE_NAME:$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

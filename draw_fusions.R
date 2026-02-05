@@ -157,8 +157,18 @@ addChr <- function(contig) {
   ifelse(contig == "MT", "chrM", paste0("chr", contig))
 }
 
+# 染色体名称标准化：统一格式，支持 chr1<->1, chrY<->Y, chrM<->MT 双向映射
+# 返回不带 "chr" 前缀的格式（如 "1", "Y", "MT"）
+normalizeChromosome <- function(contig) {
+  # 首先处理 chrM -> MT 的特殊情况
+  contig <- sub("^chrM$", "MT", contig, perl = TRUE)
+  # 然后去除其他 chr 前缀
+  sub("^chr", "", contig, perl = TRUE)
+}
+
+# 兼容旧函数名
 removeChr <- function(contig) {
-  sub("^chr", "", sub("^chrM", "MT", contig, perl = TRUE), perl = TRUE)
+  normalizeChromosome(contig)
 }
 
 between <- function(value, start, end) {
@@ -594,14 +604,16 @@ drawIdeogram <- function(adjust, left, right, y, cytobands, contig, breakpoint, 
                   stalk = "#0000ff")
   cytobands$color <- bandColors[cytobands$giemsa]
 
+  # 标准化 contig 名称以匹配 cytobands
+  contig <- normalizeChromosome(contig)
   bands <- cytobands[cytobands$contig == contig, ]
   if (nrow(bands) == 0) {
     warning(paste("Ideogram of contig", contig, "cannot be drawn"))
     return(NULL)
   }
 
-  bands$left <- bands$start / max(cytobands$end) * ideogramWidth
-  bands$right <- bands$end / max(cytobands$end) * ideogramWidth
+  bands$left <- bands$start / max(cytobands$end) * ideogram_width
+  bands$right <- bands$end / max(cytobands$end) * ideogram_width
 
   offset <- ifelse(adjust == "left", left, right - max(bands$right))
   bands$left <- bands$left + offset
@@ -610,7 +622,7 @@ drawIdeogram <- function(adjust, left, right, y, cytobands, contig, breakpoint, 
   tip <- min(bands$left) +
          (max(bands$right) - min(bands$left)) /
          (max(bands$end) - min(bands$start)) * breakpoint
-  drawCurlyBrace(left, right, y - 0.05 + curlyBraceHeight, y - 0.05, tip)
+  drawCurlyBrace(left, right, y - 0.05 + curly_brace_height, y - 0.05, tip)
 
   text((max(bands$right) + min(bands$left)) / 2, y + 0.07,
        paste("chromosome", contig), font = 2, cex = 1)
@@ -620,64 +632,64 @@ drawIdeogram <- function(adjust, left, right, y, cytobands, contig, breakpoint, 
 
   band <- 1
   leftArcX <- bands[band, "left"] +
-              (1 + cos(seq(pi / 2, 1.5 * pi, length.out = arcSteps))) *
+              (1 + cos(seq(pi / 2, 1.5 * pi, length.out = arc_steps))) *
               (bands[band, "right"] - bands[band, "left"])
-  leftArcY <- y + sin(seq(pi / 2, 1.5 * pi, length.out = arcSteps)) *
-              (ideogramHeight / 2)
+  leftArcY <- y + sin(seq(pi / 2, 1.5 * pi, length.out = arc_steps)) *
+              (ideogram_height / 2)
   polygon(leftArcX, leftArcY, col = bands[band, "color"])
 
-  centromereStart <- NULL
-  centromereEnd <- NULL
+  centromere_start <- NULL
+  centromere_end <- NULL
 
   for (bandIdx in 2:(nrow(bands) - 1)) {
     if (bands[bandIdx, "giemsa"] != "acen") {
-      rect(bands[bandIdx, "left"], y - ideogramHeight / 2,
-           bands[bandIdx, "right"], y + ideogramHeight / 2,
+      rect(bands[bandIdx, "left"], y - ideogram_height / 2,
+           bands[bandIdx, "right"], y + ideogram_height / 2,
            col = bands[bandIdx, "color"])
     } else {
-      if (is.null(centromereStart)) {
+      if (is.null(centromere_start)) {
         polygon(c(bands[bandIdx, "left"], bands[bandIdx, "right"], bands[bandIdx, "left"]),
-                c(y - ideogramHeight / 2, y, y + ideogramHeight / 2),
+                c(y - ideogram_height / 2, y, y + ideogram_height / 2),
                 col = bands[bandIdx, "color"])
-        centromereStart <- bands[bandIdx, "left"]
+        centromere_start <- bands[bandIdx, "left"]
       } else {
         polygon(c(bands[bandIdx, "right"], bands[bandIdx, "left"], bands[bandIdx, "right"]),
-                c(y - ideogramHeight / 2, y, y + ideogramHeight / 2),
+                c(y - ideogram_height / 2, y, y + ideogram_height / 2),
                 col = bands[bandIdx, "color"])
-        centromereEnd <- bands[bandIdx, "right"]
+        centromere_end <- bands[bandIdx, "right"]
       }
     }
   }
 
   band <- nrow(bands)
   rightArcX <- bands[band, "right"] -
-               (1 + cos(seq(1.5 * pi, pi / 2, length.out = arcSteps))) *
+               (1 + cos(seq(1.5 * pi, pi / 2, length.out = arc_steps))) *
                (bands[band, "right"] - bands[band, "left"])
-  rightArcY <- y + sin(seq(pi / 2, 1.5 * pi, length.out = arcSteps)) *
-               ideogramHeight / 2
+  rightArcY <- y + sin(seq(pi / 2, 1.5 * pi, length.out = arc_steps)) *
+               ideogram_height / 2
   polygon(rightArcX, rightArcY, col = bands[band, "color"])
 
-  if (is.null(centromereStart) || is.null(centromereEnd)) {
-    centromereStart <- bands[1, "right"]
-    centromereEnd <- bands[1, "right"]
+  if (is.null(centromere_start) || is.null(centromere_end)) {
+    centromere_start <- bands[1, "right"]
+    centromere_end <- bands[1, "right"]
   }
 
-  drawVerticalGradient(leftArcX, rep(centromereStart, arcSteps), leftArcY,
-                      rgb(0, 0, 0, 0.8), 1:round(arcSteps * 0.4))
-  drawVerticalGradient(leftArcX, rep(centromereStart, arcSteps), leftArcY,
-                      rgb(1, 1, 1, 0.7), round(arcSteps * 0.4):round(arcSteps * 0.1))
-  drawVerticalGradient(leftArcX, rep(centromereStart, arcSteps), leftArcY,
-                      rgb(1, 1, 1, 0.7), round(arcSteps * 0.4):round(arcSteps * 0.6))
-  drawVerticalGradient(leftArcX, rep(centromereStart, arcSteps), leftArcY,
-                      rgb(0, 0, 0, 0.9), arcSteps:round(arcSteps * 0.5))
-  drawVerticalGradient(rightArcX, rep(centromereEnd, arcSteps), rightArcY,
-                      rgb(0, 0, 0, 0.8), 1:round(arcSteps * 0.4))
-  drawVerticalGradient(rightArcX, rep(centromereEnd, arcSteps), rightArcY,
-                      rgb(1, 1, 1, 0.7), round(arcSteps * 0.4):round(arcSteps * 0.1))
-  drawVerticalGradient(rightArcX, rep(centromereEnd, arcSteps), rightArcY,
-                      rgb(1, 1, 1, 0.7), round(arcSteps * 0.4):round(arcSteps * 0.6))
-  drawVerticalGradient(rightArcX, rep(centromereEnd, arcSteps), rightArcY,
-                      rgb(0, 0, 0, 0.9), arcSteps:round(arcSteps * 0.5))
+  drawVerticalGradient(leftArcX, rep(centromere_start, arc_steps), leftArcY,
+                      rgb(0, 0, 0, 0.8), 1:round(arc_steps * 0.4))
+  drawVerticalGradient(leftArcX, rep(centromere_start, arc_steps), leftArcY,
+                      rgb(1, 1, 1, 0.7), round(arc_steps * 0.4):round(arc_steps * 0.1))
+  drawVerticalGradient(leftArcX, rep(centromere_start, arc_steps), leftArcY,
+                      rgb(1, 1, 1, 0.7), round(arc_steps * 0.4):round(arc_steps * 0.6))
+  drawVerticalGradient(leftArcX, rep(centromere_start, arc_steps), leftArcY,
+                      rgb(0, 0, 0, 0.9), arc_steps:round(arc_steps * 0.5))
+  drawVerticalGradient(rightArcX, rep(centromere_end, arc_steps), rightArcY,
+                      rgb(0, 0, 0, 0.8), 1:round(arc_steps * 0.4))
+  drawVerticalGradient(rightArcX, rep(centromere_end, arc_steps), rightArcY,
+                      rgb(1, 1, 1, 0.7), round(arc_steps * 0.4):round(arc_steps * 0.1))
+  drawVerticalGradient(rightArcX, rep(centromere_end, arc_steps), rightArcY,
+                      rgb(1, 1, 1, 0.7), round(arc_steps * 0.4):round(arc_steps * 0.6))
+  drawVerticalGradient(rightArcX, rep(centromere_end, arc_steps), rightArcY,
+                      rgb(0, 0, 0, 0.9), arc_steps:round(arc_steps * 0.5))
 }
 
 

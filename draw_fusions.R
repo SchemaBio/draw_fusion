@@ -1052,9 +1052,42 @@ if (nrow(fusions) == 0) {
 
 cytobands <- NULL
 if (cytobandsFile != "") {
-  cytobands <- read.table(cytobandsFile, header = TRUE,
-                          colClasses = c("character", "numeric", "numeric",
-                                        "character", "character"))
+  # 检测文件格式
+  is_bed <- grepl("\\.bed(\\.gz)?$", cytobandsFile, perl = TRUE)
+
+  if (is_bed) {
+    # BED 格式（支持 .bed 和 .bed.gz）
+    cytobands <- tryCatch({
+      read.table(gzfile(cytobandsFile), header = FALSE, sep = "\t")
+    }, error = function(e) {
+      read.table(cytobandsFile, header = FALSE, sep = "\t")
+    })
+
+    # 统一列名（BED 是 0-based，需要 +1）
+    # 标准 BED 格式至少需要 3 列，最多 12 列
+    # cytoBand 通常有：contig, start, end, name, giemsa (或 strand)
+    n_cols <- ncol(cytobands)
+    colnames(cytobands)[1:3] <- c("contig", "start", "end")
+
+    # 尝试自动识别 giemsa 列（包含 gneg/gpos 等关键词）
+    giemsa_col <- which(sapply(cytobands, function(x) {
+      any(grepl("^g(pos|neg)", x, ignore.case = TRUE))
+    }))
+    if (length(giemsa_col) > 0) {
+      cytobands$giemsa <- cytobands[[giemsa_col[1]]]
+    } else {
+      cytobands$giemsa <- ifelse(grepl("^chr", cytobands$contig),
+                                 sub("^chr", "", cytobands$contig), cytobands$contig)
+    }
+
+    cytobands$start <- as.numeric(cytobands$start) + 1  # BED 0-based 转 1-based
+    cytobands$contig <- removeChr(cytobands$contig)
+  } else {
+    # TSV 格式
+    cytobands <- read.table(cytobandsFile, header = TRUE,
+                            colClasses = c("character", "numeric", "numeric",
+                                          "character", "character"))
+  }
   cytobands <- cytobands[order(cytobands$contig, cytobands$start, cytobands$end), ]
 }
 if (is.null(cytobands) || !("circlize" %in% names(sessionInfo()$otherPkgs)) ||
@@ -1774,6 +1807,8 @@ for (fusion in seq_len(nrow(fusions))) {
       contig = c(fusions[fusion, "contig1"], fusions[fusion, "contig2"]),
       start = c(fusions[fusion, "breakpoint1"], fusions[fusion, "breakpoint2"])
     )
+    # 确保 contig 名称与 cytobands 一致（去除 chr 前缀以匹配）
+    geneLabels$contig <- removeChr(geneLabels$contig)
     geneLabels$end <- geneLabels$start + 1
     geneLabels$gene <- c(fusions[fusion, "gene1"], fusions[fusion, "gene2"])
     geneLabels$gene <- ifelse(
@@ -1785,19 +1820,24 @@ for (fusion in seq_len(nrow(fusions))) {
     circos.genomicLabels(geneLabels, labels.column = 4, side = "outside",
                          cex = fontSize, labels_height = 0.27)
     for (contig in unique(cytobands$contig)) {
-      set.current.cell(track.index = 2, sector.index = contig)
-      circos.text(CELL_META$xcenter, CELL_META$ycenter, contig, cex = 0.85)
+      if (contig %in% get.all.sector.index()) {
+        set.current.cell(track.index = 2, sector.index = contig)
+        circos.text(CELL_META$xcenter, CELL_META$ycenter, contig, cex = 0.85)
+      }
     }
     circos.genomicIdeogram(cytobands)
     confidenceRank <- c(low = 0, medium = 1, high = 2)
     for (i in c(setdiff(seq_len(nrow(fusions)), fusion), fusion)) {
       f <- fusions[i, ]
-      if (any(cytobands$contig == f$contig1) &&
-          any(cytobands$contig == f$contig2))
+      # 确保 contig 名称一致性后再比较
+      f_contig1 <- removeChr(f$contig1)
+      f_contig2 <- removeChr(f$contig2)
+      if (any(cytobands$contig == f_contig1) &&
+          any(cytobands$contig == f_contig2))
         if (minConfidenceForCircosPlot != "none" &&
             confidenceRank[f$confidence] >= confidenceRank[minConfidenceForCircosPlot] ||
             i == fusion)
-          circos.link(f$contig1, f$breakpoint1, f$contig2, f$breakpoint2,
+          circos.link(f_contig1, f$breakpoint1, f_contig2, f$breakpoint2,
                      lwd = 2,
                      col = ifelse(i == fusion, circosColors[f$type],
                                 getBrightColor(circosColors[f$type])))

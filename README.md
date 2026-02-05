@@ -60,22 +60,39 @@
 ### 使用Docker(推荐)
 
 ```bash
+# 拉取预构建镜像
+docker pull ghcr.io/schemabio/draw_fusion:latest
+
+# 或指定版本
+docker pull ghcr.io/schemabio/draw_fusion:v0.0.3
+
+# 运行
+docker run --rm -v $(pwd):/data ghcr.io/schemabio/draw_fusion --help
+```
+
+### 本地构建
+
+```bash
 # 构建镜像
 docker build -t draw_fusions .
-
-# 或拉取预构建镜像
-docker pull gchr.io/schemabio/draw_fusion:latest
 
 # 运行
 docker run --rm -v $(pwd):/data draw_fusions --help
 ```
 
-### 本地安装
+## 发布新版本
+
+通过提交包含版本号的 commit 来触发自动构建：
 
 ```bash
-# 安装R包
-Rscript -e "install.packages(c('GenomicRanges', 'circlize', 'GenomicAlignments'), repos='https://cloud.r-project.org/')"
+# 提交时在 message 中包含版本号，如：
+git commit -m "v0.0.3"
+
+# 推送到 main 分支
+git push origin main
 ```
+
+GitHub Actions 会自动从 commit message 中提取版本号，构建并推送 Docker 镜像。
 
 ## 使用方法
 

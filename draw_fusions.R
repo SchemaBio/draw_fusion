@@ -1107,15 +1107,43 @@ if (is.null(cytobands) || !("circlize" %in% names(sessionInfo()$otherPkgs)) ||
   plotPanels <- setdiff(plotPanels, "circos")
 
 message("Loading annotation")
-exons <- scan(exonsFile,
-              what = list(contig = "", src = "", type = "",
-                         start = 0, end = 0, score = "",
-                         strand = "", frame = "",
-                         attributes = ""),
-              sep = "\t", comment.char = "#", quote = '"',
-              multi.line = FALSE)
-attr(exons, "row.names") <- .set_row_names(length(exons[[1]]))
-class(exons) <- "data.frame"
+
+# 检测是否为 bgzip 压缩文件
+is_gzipped <- grepl("\\.gz$", exonsFile, perl = TRUE)
+
+# 读取 GTF 文件（支持 bgzip 压缩）
+if (is_gzipped) {
+  exons <- tryCatch({
+    read.table(gzfile(exonsFile),
+               header = FALSE,
+               sep = "\t",
+               comment.char = "#",
+               quote = '"',
+               stringsAsFactors = FALSE)
+  }, error = function(e) {
+    message("Failed to read gzipped GTF, falling back to uncompressed reading")
+    read.table(exonsFile,
+               header = FALSE,
+               sep = "\t",
+               comment.char = "#",
+               quote = '"',
+               stringsAsFactors = FALSE)
+  })
+  colnames(exons) <- c("contig", "src", "type", "start", "end", "score",
+                       "strand", "frame", "attributes")
+} else {
+  exons <- scan(exonsFile,
+                what = list(contig = "", src = "", type = "",
+                           start = 0, end = 0, score = "",
+                           strand = "", frame = "",
+                           attributes = ""),
+                sep = "\t", comment.char = "#", quote = '"',
+                multi.line = FALSE)
+  attr(exons, "row.names") <- .set_row_names(length(exons[[1]]))
+  class(exons) <- "data.frame"
+}
+
+# 过滤外显子和 CDS
 exons <- exons[exons$type %in% c("exon", "CDS"),
               c("contig", "type", "start", "end", "strand", "attributes")]
 exons$contig <- removeChr(exons$contig)

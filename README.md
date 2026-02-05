@@ -55,6 +55,23 @@
   - `circlize` - 用于Circos图
   - `GenomicAlignments` - 用于reads覆盖图（可选）
 
+## GTF 索引优化（可选，推荐）
+
+为了加快 GTF 文件加载速度，可以使用 bgzip 压缩 + tabix 索引：
+
+```bash
+# 安装工具（如果需要）
+# conda install -c bioconda htslib
+
+# 压缩 GTF 文件
+bgzip -c annotation.gtf > annotation.gtf.gz
+
+# 创建 tabix 索引（GTF 使用 gff 预设）
+tabix -p gff annotation.gtf.gz
+```
+
+启用索引后，运行时会自动检测并使用压缩文件，显著减少内存占用和加载时间。
+
 ## 安装
 
 ### 使用Docker(推荐)
@@ -144,7 +161,7 @@ Rscript draw_fusions.R \
 | `--breakpoint1` | 数值 | ✅ | 0 | 断点1位置 |
 | `--breakpoint2` | 数值 | ✅ | 0 | 断点2位置 |
 | **必需参数** |
-| `--annotation` | 文件 | ✅ | annotation.gtf | GTF注释文件 |
+| `--annotation` | 文件 | ✅ | annotation.gtf | GTF注释文件（支持 .gz 压缩格式以提升性能） |
 | `--output` | 字符串 | ✅ | output.pdf | 输出PDF文件名 |
 | **可选参数** |
 | `--strand1` | 字符串 | 否 | "." | 链信息 |
